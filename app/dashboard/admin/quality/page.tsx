@@ -1,142 +1,120 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
-import { Search, Eye, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Loader2, MapPin, Plus, X } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { getAllQualityReviews, updateQualityReviewStatus, type QualityReview } from "@/lib/firestore"
+import { toast } from "sonner"
+import { getAllUsers, updateUser, type UserDoc } from "@/lib/firestore"
 
-const fallbackReviews: QualityReview[] = [
-  { id: "QR001", batchId: "BATCH045", shgId: "shg1", shgName: "Mahila SHG", product: "Organic Ragi Flour", quantity: "85 kg", status: "pending", submittedDate: "2024-01-15", moistureContent: "12%", purity: "98.5%", foreignMatter: "0.5%", notes: "Freshly processed from December harvest" },
-  { id: "QR002", batchId: "BATCH046", shgId: "shg2", shgName: "Green Valley SHG", product: "Pearl Millet Atta", quantity: "60 kg", status: "pending", submittedDate: "2024-01-14", moistureContent: "11%", purity: "99%", foreignMatter: "0.3%", notes: "Premium grade bajra flour" },
-  { id: "QR003", batchId: "BATCH044", shgId: "shg3", shgName: "Sunrise SHG", product: "Foxtail Millet Rice", quantity: "45 kg", status: "approved", submittedDate: "2024-01-12", moistureContent: "10%", purity: "99.2%", foreignMatter: "0.2%", notes: "High quality foxtail millet" },
-  { id: "QR004", batchId: "BATCH043", shgId: "shg4", shgName: "Nari Shakti SHG", product: "Millet Mix Pack", quantity: "30 packs", status: "rejected", submittedDate: "2024-01-10", moistureContent: "15%", purity: "95%", foreignMatter: "2%", notes: "Moisture content too high", reviewerNotes: "Moisture content exceeds acceptable limit. Needs re-processing." },
-]
-
-export default function AdminQuality() {
-  const [reviews, setReviews] = useState<QualityReview[]>([])
+export default function SHGTalukAssignmentPage() {
+  const [shgs, setShgs] = useState<UserDoc[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [rejectionReason, setRejectionReason] = useState("")
+  const [editingSHG, setEditingSHG] = useState<UserDoc | null>(null)
+  const [newTaluk, setNewTaluk] = useState("")
+  const [editTaluks, setEditTaluks] = useState<string[]>([])
 
   useEffect(() => {
-    const loadReviews = async () => {
+    async function fetchSHGs() {
       try {
-        const allReviews = await getAllQualityReviews()
-        if (allReviews.length > 0) {
-          setReviews(allReviews)
-        } else {
-          setReviews(fallbackReviews)
-        }
+        const allUsers = await getAllUsers()
+        setShgs(allUsers.filter((u) => u.role === "shg"))
       } catch (error) {
-        console.error("Error loading reviews:", error)
-        setReviews(fallbackReviews)
+        console.error("Error:", error)
       } finally {
         setLoading(false)
       }
     }
-    loadReviews()
+    fetchSHGs()
   }, [])
 
-  const filteredReviews = reviews.filter(review =>
-    review.batchId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    review.shgName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    review.product.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  function addTaluk() {
+    const t = newTaluk.trim()
+    if (!t) return
+    if (editTaluks.includes(t)) { toast.error("Taluk already assigned"); return }
+    setEditTaluks([...editTaluks, t])
+    setNewTaluk("")
+  }
 
-  const handleApprove = async (id: string) => {
+  function removeTaluk(taluk: string) {
+    setEditTaluks(editTaluks.filter((t) => t !== taluk))
+  }
+
+  async function handleSave() {
+    if (!editingSHG) return
     try {
-      await updateQualityReviewStatus(id, "approved")
-      setReviews(reviews.map(review => review.id === id ? { ...review, status: "approved" as const } : review))
+      await updateUser(editingSHG.id!, { assignedTaluks: editTaluks })
+      toast.success("Taluk assignments updated")
+      setEditingSHG(null)
+      const allUsers = await getAllUsers()
+      setShgs(allUsers.filter((u) => u.role === "shg"))
     } catch (error) {
-      console.error("Error approving review:", error)
-    }
-  }
-
-  const handleReject = async (id: string) => {
-    if (rejectionReason) {
-      try {
-        await updateQualityReviewStatus(id, "rejected", rejectionReason)
-        setReviews(reviews.map(review => review.id === id ? { ...review, status: "rejected" as const, reviewerNotes: rejectionReason } : review))
-        setRejectionReason("")
-      } catch (error) {
-        console.error("Error rejecting review:", error)
-      }
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "approved": return <Badge className="bg-primary/10 text-primary"><CheckCircle className="mr-1 h-3 w-3" />Approved</Badge>
-      case "rejected": return <Badge variant="destructive"><XCircle className="mr-1 h-3 w-3" />Rejected</Badge>
-      default: return <Badge className="bg-accent text-accent-foreground"><Clock className="mr-1 h-3 w-3" />Pending</Badge>
+      toast.error("Failed to update assignments")
     }
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Quality Review</h1>
-        <p className="text-muted-foreground">Review and verify quality details submitted by SHGs</p>
+        <h1 className="text-3xl font-bold text-foreground">SHG-Taluk Assignment</h1>
+        <p className="text-muted-foreground">Assign SHGs to taluks for crop verification duties</p>
       </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border"><CardContent className="p-4 flex items-center gap-4"><div className="h-10 w-10 rounded-full bg-accent flex items-center justify-center"><Clock className="h-5 w-5 text-accent-foreground" /></div><div><p className="text-2xl font-bold text-foreground">{reviews.filter(r => r.status === "pending").length}</p><p className="text-sm text-muted-foreground">Pending Review</p></div></CardContent></Card>
-        <Card className="border-border"><CardContent className="p-4 flex items-center gap-4"><div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center"><CheckCircle className="h-5 w-5 text-primary" /></div><div><p className="text-2xl font-bold text-foreground">{reviews.filter(r => r.status === "approved").length}</p><p className="text-sm text-muted-foreground">Approved</p></div></CardContent></Card>
-        <Card className="border-border"><CardContent className="p-4 flex items-center gap-4"><div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center"><XCircle className="h-5 w-5 text-destructive" /></div><div><p className="text-2xl font-bold text-foreground">{reviews.filter(r => r.status === "rejected").length}</p><p className="text-sm text-muted-foreground">Rejected</p></div></CardContent></Card>
-      </div>
-
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search by batch ID, SHG, or product..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
-      </div>
-
-      <div className="space-y-4">
-        {filteredReviews.map((review) => (
-          <Card key={review.id} className="border-border">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div><CardTitle className="text-lg text-foreground">{review.product}</CardTitle><CardDescription>{review.batchId} - {review.shgName}</CardDescription></div>
-                {getStatusBadge(review.status)}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-4">
-                <div className="p-3 bg-muted rounded-lg"><p className="text-xs text-muted-foreground">Moisture Content</p><p className="font-medium text-foreground">{review.moistureContent}</p></div>
-                <div className="p-3 bg-muted rounded-lg"><p className="text-xs text-muted-foreground">Purity</p><p className="font-medium text-foreground">{review.purity}</p></div>
-                <div className="p-3 bg-muted rounded-lg"><p className="text-xs text-muted-foreground">Foreign Matter</p><p className="font-medium text-foreground">{review.foreignMatter}</p></div>
-                <div className="p-3 bg-muted rounded-lg"><p className="text-xs text-muted-foreground">Quantity</p><p className="font-medium text-foreground">{review.quantity}</p></div>
-              </div>
-              <div className="p-3 bg-muted rounded-lg mb-4"><p className="text-xs text-muted-foreground mb-1">Notes from SHG</p><p className="text-sm text-foreground">{review.notes}</p></div>
-              {review.reviewerNotes && (<div className="p-3 bg-destructive/10 rounded-lg mb-4"><p className="text-xs text-destructive mb-1">Rejection Reason</p><p className="text-sm text-foreground">{review.reviewerNotes}</p></div>)}
-              {review.status === "pending" && (
-                <div className="flex gap-2">
-                  <Button onClick={() => handleApprove(review.id!)} className="flex-1"><CheckCircle className="mr-2 h-4 w-4" />Approve</Button>
-                  <Dialog>
-                    <DialogTrigger asChild><Button variant="outline" className="flex-1 bg-transparent"><XCircle className="mr-2 h-4 w-4" />Reject</Button></DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader><DialogTitle>Reject Quality Review</DialogTitle><DialogDescription>Provide a reason for rejection</DialogDescription></DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2"><Label>Rejection Reason</Label><Textarea placeholder="Enter the reason for rejection..." value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} /></div>
-                        <Button variant="destructive" className="w-full" onClick={() => handleReject(review.id!)} disabled={!rejectionReason}>Confirm Rejection</Button>
+      <Card className="border-border p-4 bg-muted/50">
+        <div className="flex items-start gap-3"><MapPin className="h-5 w-5 text-primary mt-0.5" /><div><p className="font-medium text-foreground">How SHG-Taluk Assignment Works</p><p className="text-sm text-muted-foreground">Each SHG is assigned to one or more taluks. When a farmer uploads a crop listing from a taluk, only the SHGs assigned to that taluk can verify it. This ensures local quality checks by SHGs who know the area.</p></div></div>
+      </Card>
+      <Card className="border-border">
+        <CardHeader><CardTitle className="text-foreground">SHG Assignments ({shgs.length})</CardTitle><CardDescription>Manage which taluks each SHG is responsible for</CardDescription></CardHeader>
+        <CardContent>
+          {shgs.length === 0 ? <p className="text-center py-8 text-muted-foreground">No SHGs registered yet</p> : (
+            <Table>
+              <TableHeader><TableRow><TableHead>SHG Name</TableHead><TableHead>District</TableHead><TableHead>Assigned Taluks</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {shgs.map((shg) => (
+                  <TableRow key={shg.id}>
+                    <TableCell className="font-medium text-foreground">{shg.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{shg.district || "N/A"}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {shg.assignedTaluks && shg.assignedTaluks.length > 0 ? shg.assignedTaluks.map((t) => <Badge key={t} variant="secondary">{t}</Badge>) : <span className="text-muted-foreground text-sm">No taluks assigned</span>}
                       </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                    </TableCell>
+                    <TableCell><Badge variant={shg.status === "active" ? "default" : "secondary"}>{shg.status || "active"}</Badge></TableCell>
+                    <TableCell>
+                      <Dialog>
+                        <DialogTrigger asChild><Button variant="outline" size="sm" onClick={() => { setEditingSHG(shg); setEditTaluks(shg.assignedTaluks || []); setNewTaluk("") }}>Edit Taluks</Button></DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader><DialogTitle>Assign Taluks to {shg.name}</DialogTitle><DialogDescription>Add or remove taluk assignments for this SHG</DialogDescription></DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              {editTaluks.length === 0 ? <p className="text-sm text-muted-foreground">No taluks assigned</p> : editTaluks.map((t) => (
+                                <Badge key={t} variant="secondary" className="flex items-center gap-1">{t}<button onClick={() => removeTaluk(t)}><X className="h-3 w-3" /></button></Badge>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <Input placeholder="Enter taluk name" value={newTaluk} onChange={(e) => setNewTaluk(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTaluk() } }} />
+                              <Button variant="outline" size="sm" onClick={addTaluk}><Plus className="h-4 w-4" /></Button>
+                            </div>
+                          </div>
+                          <DialogFooter><Button onClick={handleSave}>Save Assignments</Button></DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

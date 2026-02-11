@@ -1,175 +1,117 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
-import { Search, Check, X, MoreHorizontal, User, Users, Loader2, UserPlus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Loader2, Search, Trash2, Edit } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { getAllUsers, approveUser, deleteUser, type User as UserType } from "@/lib/firestore"
+import { toast } from "sonner"
+import { getAllUsers, updateUser, deleteUserDoc, type UserDoc } from "@/lib/firestore"
 
-export default function AdminUsers() {
-  const [users, setUsers] = useState<UserType[]>([])
+export default function AdminUsersPage() {
+  const [users, setUsers] = useState<UserDoc[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterType, setFilterType] = useState("all")
-  const [filterStatus, setFilterStatus] = useState("all")
+  const [roleFilter, setRoleFilter] = useState("all")
+  const [editingUser, setEditingUser] = useState<UserDoc | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editRole, setEditRole] = useState("")
+  const [editStatus, setEditStatus] = useState("")
 
   useEffect(() => {
-    const loadUsers = async () => {
+    async function fetchUsers() {
       try {
-        const allUsers = await getAllUsers()
-        setUsers(allUsers)
+        const data = await getAllUsers()
+        setUsers(data)
       } catch (error) {
-        console.error("Error loading users:", error)
-        setUsers([])
+        console.error("Error:", error)
       } finally {
         setLoading(false)
       }
     }
-    loadUsers()
+    fetchUsers()
   }, [])
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.location.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = filterType === "all" || user.type === filterType
-    const matchesStatus = filterStatus === "all" || user.status === filterStatus
-    return matchesSearch && matchesType && matchesStatus
+  async function handleUpdate() {
+    if (!editingUser) return
+    try {
+      await updateUser(editingUser.id!, { name: editName, role: editRole, status: editStatus })
+      toast.success("User updated")
+      setEditingUser(null)
+      const data = await getAllUsers()
+      setUsers(data)
+    } catch (error) {
+      toast.error("Failed to update user")
+    }
+  }
+
+  async function handleDelete(userId: string) {
+    if (!confirm("Are you sure you want to delete this user?")) return
+    try {
+      await deleteUserDoc(userId)
+      toast.success("User deleted")
+      setUsers(users.filter((u) => u.id !== userId))
+    } catch (error) {
+      toast.error("Failed to delete user")
+    }
+  }
+
+  const filtered = users.filter((u) => {
+    const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesRole = roleFilter === "all" || u.role === roleFilter
+    return matchesSearch && matchesRole
   })
 
-  const handleApprove = async (id: string, type: 'farmer' | 'shg') => {
-    try {
-      await approveUser(id, type)
-      setUsers(users.map(user => user.id === id ? { ...user, status: "active" as const } : user))
-    } catch (error) {
-      console.error("Error approving user:", error)
-    }
-  }
-
-  const handleReject = async (id: string, type: 'farmer' | 'shg') => {
-    try {
-      await deleteUser(id, type)
-      setUsers(users.filter(user => user.id !== id))
-    } catch (error) {
-      console.error("Error rejecting user:", error)
-    }
-  }
-
   if (loading) {
-    return <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">User Management</h1>
-        <p className="text-muted-foreground">Approve and manage farmers and SHGs</p>
+    <div className="space-y-6">
+      <div><h1 className="text-3xl font-bold text-foreground">User Management</h1><p className="text-muted-foreground">Manage all platform users</p></div>
+      <div className="flex gap-4">
+        <div className="relative flex-1 max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search users..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" /></div>
+        <Select value={roleFilter} onValueChange={setRoleFilter}><SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All Roles</SelectItem><SelectItem value="farmer">Farmer</SelectItem><SelectItem value="shg">SHG</SelectItem><SelectItem value="consumer">Consumer</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select>
       </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-border"><CardContent className="p-4"><p className="text-2xl font-bold text-foreground">{users.filter(u => u.type === "farmer").length}</p><p className="text-sm text-muted-foreground">Total Farmers</p></CardContent></Card>
-        <Card className="border-border"><CardContent className="p-4"><p className="text-2xl font-bold text-foreground">{users.filter(u => u.type === "shg").length}</p><p className="text-sm text-muted-foreground">Total SHGs</p></CardContent></Card>
-        <Card className="border-border"><CardContent className="p-4"><p className="text-2xl font-bold text-foreground">{users.filter(u => u.status === "active").length}</p><p className="text-sm text-muted-foreground">Active Users</p></CardContent></Card>
-        <Card className="border-border"><CardContent className="p-4"><p className="text-2xl font-bold text-accent-foreground">{users.filter(u => u.status === "pending").length}</p><p className="text-sm text-muted-foreground">Pending Approval</p></CardContent></Card>
-      </div>
-
-      <div className="flex flex-col gap-4 sm:flex-row">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by name or location..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
-        </div>
-        <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="User Type" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="farmer">Farmers</SelectItem>
-            <SelectItem value="shg">SHGs</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       <Card className="border-border">
-        <CardHeader><CardTitle className="text-foreground">All Users</CardTitle><CardDescription>Manage farmers and self-help groups</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-foreground">Users ({filtered.length})</CardTitle><CardDescription>All registered users on the platform</CardDescription></CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Name</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Type</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Location</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Phone</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <UserPlus className="h-10 w-10 text-muted-foreground" />
-                        <p className="text-muted-foreground">No users found</p>
-                        <p className="text-sm text-muted-foreground">Users will appear here when they register</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <tr key={user.id} className="border-b border-border last:border-0">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                            {user.type === "farmer" ? <User className="h-4 w-4 text-muted-foreground" /> : <Users className="h-4 w-4 text-muted-foreground" />}
+          <Table>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>District</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {filtered.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium text-foreground">{user.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                  <TableCell><Badge variant="outline">{user.role}</Badge></TableCell>
+                  <TableCell className="text-muted-foreground">{user.district || "N/A"}</TableCell>
+                  <TableCell><Badge variant={user.status === "active" ? "default" : "secondary"}>{user.status || "active"}</Badge></TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Dialog>
+                        <DialogTrigger asChild><Button variant="outline" size="sm" onClick={() => { setEditingUser(user); setEditName(user.name); setEditRole(user.role); setEditStatus(user.status || "active") }}><Edit className="h-4 w-4" /></Button></DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader><DialogTitle>Edit User</DialogTitle><DialogDescription>Update user details</DialogDescription></DialogHeader>
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2"><Label>Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
+                            <div className="space-y-2"><Label>Role</Label><Select value={editRole} onValueChange={setEditRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="farmer">Farmer</SelectItem><SelectItem value="shg">SHG</SelectItem><SelectItem value="consumer">Consumer</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div>
+                            <div className="space-y-2"><Label>Status</Label><Select value={editStatus} onValueChange={setEditStatus}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="suspended">Suspended</SelectItem></SelectContent></Select></div>
                           </div>
-                          <div>
-                            <p className="font-medium text-foreground">{user.name}</p>
-                            {user.members && <p className="text-xs text-muted-foreground">{user.members} members</p>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4"><Badge variant="secondary">{user.type === "farmer" ? "Farmer" : "SHG"}</Badge></td>
-                      <td className="py-3 px-4 text-sm text-foreground">{user.location}</td>
-                      <td className="py-3 px-4 text-sm text-foreground">{user.phone}</td>
-                      <td className="py-3 px-4">
-                        <Badge className={user.status === "active" ? "bg-primary/10 text-primary" : "bg-accent text-accent-foreground"}>
-                          {user.status === "active" ? "Active" : "Pending"}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4">
-                        {user.status === "pending" ? (
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={() => handleApprove(user.id!, user.type as 'farmer' | 'shg')}><Check className="h-4 w-4" /></Button>
-                            <Button size="sm" variant="outline" onClick={() => handleReject(user.id!, user.type as 'farmer' | 'shg')}><X className="h-4 w-4" /></Button>
-                          </div>
-                        ) : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem>View Details</DropdownMenuItem>
-                              <DropdownMenuItem>Edit</DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive">Suspend</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                          <DialogFooter><Button onClick={handleUpdate}>Save Changes</Button></DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                      {user.role !== "admin" && <Button variant="destructive" size="sm" onClick={() => handleDelete(user.id!)}><Trash2 className="h-4 w-4" /></Button>}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

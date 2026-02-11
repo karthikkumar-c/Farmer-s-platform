@@ -1,100 +1,87 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
-import { Package, Truck, CheckCircle, MapPin, Clock, User, Store, Loader2 } from "lucide-react"
+import { Loader2, MapPin, Package, CheckCircle, Truck } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getOrdersForTracking, type OrderTracking } from "@/lib/firestore"
+import { getOrdersForTracking } from "@/lib/firestore"
 
-export default function ConsumerTracking() {
-  const [activeOrders, setActiveOrders] = useState<OrderTracking[]>([])
+const DEMO_CONSUMER_ID = "consumer1"
+
+const STEPS = [
+  { key: "pending", label: "Order Placed", icon: Package },
+  { key: "confirmed", label: "Confirmed by Farmer", icon: CheckCircle },
+  { key: "shipped", label: "Shipped", icon: Truck },
+  { key: "delivered", label: "Delivered", icon: MapPin },
+]
+
+function getStepIndex(status: string) {
+  const idx = STEPS.findIndex((s) => s.key === status)
+  return idx >= 0 ? idx : 0
+}
+
+export default function TrackingPage() {
+  const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const loadOrders = async () => {
+    async function fetchOrders() {
       try {
-        // In production, use actual consumer ID from auth
-        const orders = await getOrdersForTracking("demo-consumer")
-        setActiveOrders(orders)
+        const data = await getOrdersForTracking(DEMO_CONSUMER_ID)
+        setOrders(data)
       } catch (error) {
-        console.error("Error loading orders:", error)
-        setActiveOrders([])
+        console.error("Error:", error)
       } finally {
         setLoading(false)
       }
     }
-    loadOrders()
+    fetchOrders()
   }, [])
 
   if (loading) {
-    return <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
-  return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Track Orders</h1>
-        <p className="text-muted-foreground">Real-time tracking of your active orders</p>
-      </div>
+  const activeOrders = orders.filter((o) => o.status !== "delivered" && o.status !== "cancelled")
 
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">Order Tracking</h1>
+        <p className="text-muted-foreground">Track the status of your orders from farmers</p>
+      </div>
       {activeOrders.length === 0 ? (
-        <Card className="border-border">
-          <CardContent className="p-8 text-center">
-            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-lg font-medium text-foreground">No Active Orders</p>
-            <p className="text-muted-foreground">All your orders have been delivered!</p>
-          </CardContent>
-        </Card>
+        <Card className="border-border"><CardContent className="py-8 text-center"><p className="text-muted-foreground">No active orders to track</p></CardContent></Card>
       ) : (
-        <div className="space-y-6">
-          {activeOrders.map((order) => (
-            <Card key={order.id} className="border-border">
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className="text-foreground">{order.product}</CardTitle>
-                    <CardDescription>Order {order.id} - {order.shg}</CardDescription>
+        <div className="space-y-4">
+          {activeOrders.map((order) => {
+            const currentStep = getStepIndex(order.status)
+            return (
+              <Card key={order.id} className="border-border">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div><CardTitle className="text-foreground">{order.productName}</CardTitle><CardDescription>From {order.sellerName} - {order.quantity} {order.unit}</CardDescription></div>
+                    <Badge variant={order.status === "shipped" ? "default" : "secondary"}>{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</Badge>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge className={order.currentStatus === "in_transit" ? "bg-primary/10 text-primary" : "bg-accent text-accent-foreground"}>
-                      {order.currentStatus === "in_transit" ? (<><Truck className="mr-1 h-3 w-3" /> In Transit</>) : (<><Clock className="mr-1 h-3 w-3" /> Processing</>)}
-                    </Badge>
-                    <span className="text-sm font-bold text-primary">Rs {order.price}</span>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6 p-4 bg-muted rounded-lg">
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-primary" />
-                    <span className="text-muted-foreground">Estimated Delivery:</span>
-                    <span className="font-medium text-foreground">{order.estimatedDelivery}</span>
-                  </div>
-                </div>
-                <div className="relative">
-                  {order.timeline.map((step, index) => (
-                    <div key={step.status} className="flex gap-4 pb-6 last:pb-0">
-                      <div className="flex flex-col items-center">
-                        <div className={`h-8 w-8 rounded-full flex items-center justify-center ${step.completed ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                          {step.status === "Order Placed" && <Package className="h-4 w-4" />}
-                          {step.status === "Order Confirmed" && <CheckCircle className="h-4 w-4" />}
-                          {step.status === "Processing" && <Clock className="h-4 w-4" />}
-                          {step.status === "Packed & Ready" && <Store className="h-4 w-4" />}
-                          {step.status === "Out for Delivery" && <Truck className="h-4 w-4" />}
-                          {step.status === "Delivered" && <User className="h-4 w-4" />}
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    {STEPS.map((step, i) => {
+                      const StepIcon = step.icon
+                      const isComplete = i <= currentStep
+                      return (
+                        <div key={step.key} className="flex flex-col items-center flex-1">
+                          <div className={"flex items-center justify-center w-10 h-10 rounded-full " + (isComplete ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}><StepIcon className="h-5 w-5" /></div>
+                          <p className={"text-xs mt-2 text-center " + (isComplete ? "text-primary font-medium" : "text-muted-foreground")}>{step.label}</p>
+                          {i < STEPS.length - 1 && <div className={"h-0.5 w-full mt-2 " + (i < currentStep ? "bg-primary" : "bg-muted")} />}
                         </div>
-                        {index < order.timeline.length - 1 && (<div className={`w-0.5 flex-1 ${step.completed ? "bg-primary" : "bg-border"}`} />)}
-                      </div>
-                      <div className="flex-1 pb-2">
-                        <p className={`font-medium ${step.completed ? "text-foreground" : "text-muted-foreground"}`}>{step.status}</p>
-                        <p className="text-sm text-muted-foreground">{step.date} {step.time && `at ${step.time}`}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
     </div>

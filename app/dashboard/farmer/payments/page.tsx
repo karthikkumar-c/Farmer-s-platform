@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect } from "react"
 import { CreditCard, TrendingUp, ArrowDownRight, ArrowUpRight, Wallet, Loader2 } from "lucide-react"
@@ -6,16 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { getFarmerPayments, getFarmerPaymentStats } from "@/lib/firestore"
 
-// Demo Farmer ID - in real app, get from auth
-const DEMO_FARMER_ID = "demo-farmer-1"
+const DEMO_FARMER_ID = "farmer1"
 
 export default function FarmerPayments() {
   const [payments, setPayments] = useState<any[]>([])
-  const [stats, setStats] = useState([
-    { label: "Total Earnings", value: "Rs 0", icon: Wallet, change: "No data yet", positive: true },
-    { label: "Pending Payments", value: "Rs 0", icon: CreditCard, change: "No pending", positive: false },
-    { label: "This Month", value: "Rs 0", icon: TrendingUp, change: "No data yet", positive: true },
-  ])
+  const [paymentStats, setPaymentStats] = useState({ totalEarnings: 0, pendingPayments: 0, thisMonth: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,14 +20,8 @@ export default function FarmerPayments() {
           getFarmerPayments(DEMO_FARMER_ID),
           getFarmerPaymentStats(DEMO_FARMER_ID),
         ])
-
         setPayments(paymentsData)
-
-        setStats([
-          { label: "Total Earnings", value: `Rs ${statsData.totalEarnings?.toLocaleString() || '0'}`, icon: Wallet, change: "+18% from last month", positive: true },
-          { label: "Pending Payments", value: `Rs ${statsData.pendingPayments?.toLocaleString() || '0'}`, icon: CreditCard, change: "Awaiting settlement", positive: false },
-          { label: "This Month", value: `Rs ${Math.round(statsData.thisMonth || 0).toLocaleString()}`, icon: TrendingUp, change: "+25% growth", positive: true },
-        ])
+        setPaymentStats(statsData)
       } catch (error) {
         console.error("Error fetching payments:", error)
       } finally {
@@ -43,23 +32,23 @@ export default function FarmerPayments() {
   }, [])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
+
+  const statsDisplay = [
+    { label: "Total Earnings", value: "Rs " + paymentStats.totalEarnings.toLocaleString(), icon: Wallet, change: "All time earnings", positive: true },
+    { label: "Pending Payments", value: "Rs " + paymentStats.pendingPayments.toLocaleString(), icon: CreditCard, change: "Awaiting settlement", positive: false },
+    { label: "This Month", value: "Rs " + paymentStats.thisMonth.toLocaleString(), icon: TrendingUp, change: "Current month", positive: true },
+  ]
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Payment History</h1>
-        <p className="text-muted-foreground">Track your earnings and payment status</p>
+        <p className="text-muted-foreground">Track your earnings from consumer purchases</p>
       </div>
-
-      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
-        {stats.map((stat) => (
+        {statsDisplay.map((stat) => (
           <Card key={stat.label} className="border-border">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{stat.label}</CardTitle>
@@ -67,7 +56,7 @@ export default function FarmerPayments() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">{stat.value}</div>
-              <p className={`text-xs flex items-center gap-1 mt-1 ${stat.positive ? "text-primary" : "text-muted-foreground"}`}>
+              <p className={"text-xs flex items-center gap-1 mt-1 " + (stat.positive ? "text-primary" : "text-muted-foreground")}>
                 {stat.positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                 {stat.change}
               </p>
@@ -75,13 +64,8 @@ export default function FarmerPayments() {
           </Card>
         ))}
       </div>
-
-      {/* Payment History */}
       <Card className="border-border">
-        <CardHeader>
-          <CardTitle className="text-foreground">Transaction History</CardTitle>
-          <CardDescription>All your payment transactions</CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-foreground">Transaction History</CardTitle><CardDescription>All payment transactions from consumers</CardDescription></CardHeader>
         <CardContent>
           {payments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
@@ -92,31 +76,21 @@ export default function FarmerPayments() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Payment ID</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Order ID</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">From SHG</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Method</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-                  </tr>
-                </thead>
+                <thead><tr className="border-b border-border">
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Payment ID</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">From Consumer</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Method</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
+                </tr></thead>
                 <tbody>
-                  {payments.map((payment, index) => (
-                    <tr key={payment.id || index} className="border-b border-border last:border-0">
-                      <td className="py-3 px-4 text-sm font-medium text-foreground">{payment.id}</td>
-                      <td className="py-3 px-4 text-sm text-foreground">{payment.orderId}</td>
-                      <td className="py-3 px-4 text-sm text-foreground">{payment.shgName}</td>
-                      <td className="py-3 px-4 text-sm font-bold text-primary">Rs {payment.amount.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-sm text-foreground">{payment.method}</td>
-                      <td className="py-3 px-4">
-                        <Badge className={payment.status === "completed" ? "bg-primary/10 text-primary" : "bg-accent text-accent-foreground"}>
-                          {payment.status === "completed" ? "Completed" : "Pending"}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{payment.date}</td>
+                  {payments.map((payment: any) => (
+                    <tr key={payment.id} className="border-b border-border last:border-0">
+                      <td className="py-3 px-4 text-sm font-medium text-foreground">{payment.id?.slice(0, 8)}</td>
+                      <td className="py-3 px-4 text-sm text-foreground">{payment.consumerName || "Consumer"}</td>
+                      <td className="py-3 px-4 text-sm font-bold text-primary">Rs {(payment.amount || 0).toLocaleString()}</td>
+                      <td className="py-3 px-4 text-sm text-foreground">{payment.method || "UPI"}</td>
+                      <td className="py-3 px-4"><Badge className={payment.status === "completed" ? "bg-primary/10 text-primary" : "bg-accent text-accent-foreground"}>{payment.status === "completed" ? "Completed" : "Pending"}</Badge></td>
                     </tr>
                   ))}
                 </tbody>
