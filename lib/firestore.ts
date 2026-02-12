@@ -193,6 +193,21 @@ export async function getFarmerPaymentStats(farmerId: string) {
   }
 }
 
+export async function createPayment(data: {
+  orderId: string;
+  farmerId: string;
+  farmerName: string;
+  consumerId: string;
+  consumerName: string;
+  productName: string;
+  amount: number;
+  method: string;
+  status: 'pending' | 'completed';
+}): Promise<string> {
+  const docRef = await addDoc(collection(db, 'payments'), { ...data, createdAt: serverTimestamp() });
+  return docRef.id;
+}
+
 // ============================================
 // SHG FUNCTIONS (Quality Verifier)
 // ============================================
@@ -400,6 +415,25 @@ export async function updateOrderStatus(id: string, status: string): Promise<voi
   const updateData: any = { status };
   if (status === 'delivered') updateData.deliveryDate = serverTimestamp();
   await updateDoc(doc(db, 'orders', id), updateData);
+
+  // Auto-create a completed payment when order is delivered
+  if (status === 'delivered') {
+    const orderSnap = await getDoc(doc(db, 'orders', id));
+    if (orderSnap.exists()) {
+      const order = orderSnap.data() as Order;
+      await createPayment({
+        orderId: id,
+        farmerId: order.sellerId,
+        farmerName: order.sellerName,
+        consumerId: order.buyerId,
+        consumerName: order.buyerName,
+        productName: order.productName,
+        amount: order.totalPrice,
+        method: 'UPI',
+        status: 'completed',
+      });
+    }
+  }
 }
 
 export async function getAnalyticsData() {
