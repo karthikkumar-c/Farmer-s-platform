@@ -17,3 +17,6 @@ uploads/
 # OS
 .DS_Store
 Thumbs.db
+
+# Environment file without dot prefix
+env

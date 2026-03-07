@@ -34,3 +34,8 @@ AI_*.md
 QUICKSTART_*.md
 IMPLEMENTATION_*.md
 local-layout.tsx
+# Backend environment files
+backend/env
+backend/.env*
+.env
+.env.*
