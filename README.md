@@ -11,6 +11,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 ### Multi-Role Dashboards
 
 #### 👨‍🌾 Farmer Dashboard
+
 - Product listing management
 - Order tracking
 - Payment history
@@ -18,6 +19,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 - Profile management
 
 #### 🤝 SHG (Self-Help Group) Dashboard
+
 - Farmer verification
 - Batch management
 - Product quality control
@@ -26,6 +28,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 - History tracking
 
 #### 👥 Consumer Dashboard
+
 - Browse verified millet products
 - Place orders
 - Track deliveries
@@ -34,6 +37,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 - Product reviews
 
 #### 👨‍💼 Admin Dashboard
+
 - User management
 - Analytics & insights
 - Market insights
@@ -65,6 +69,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 ## 🛠️ Tech Stack
 
 ### Frontend
+
 - **Next.js 14** - React framework
 - **TypeScript** - Type safety
 - **Tailwind CSS** - Styling
@@ -72,6 +77,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 - **Recharts** - Data visualization
 
 ### Backend
+
 - **Node.js** - Server runtime
 - **Express** - Web framework
 - **Firebase** - Authentication & Database
@@ -104,7 +110,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or pnpm
 - Firebase account
 - Gemini API key
@@ -112,12 +118,14 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/selvapraveenv/AI-Based-Millet-Value-Chain-Management-System.git
    cd AI-Based-Millet-Value-Chain-Management-System
    ```
 
 2. **Install frontend dependencies**
+
    ```bash
    npm install
    # or
@@ -125,6 +133,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
    ```
 
 3. **Install backend dependencies**
+
    ```bash
    cd backend
    npm install
@@ -133,6 +142,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 4. **Configure environment variables**
 
    Frontend `.env.local`:
+
    ```env
    NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_auth_domain
@@ -143,6 +153,7 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
    ```
 
    Backend `.env`:
+
    ```env
    PORT=5000
    FIREBASE_PROJECT_ID=your_project_id
@@ -155,12 +166,14 @@ This system connects farmers, Self-Help Groups (SHGs), consumers, and administra
 5. **Run the development servers**
 
    Terminal 1 - Frontend:
+
    ```bash
    npm run dev
    # Frontend runs on http://localhost:3000
    ```
 
    Terminal 2 - Backend:
+
    ```bash
    cd backend
    node server.js
