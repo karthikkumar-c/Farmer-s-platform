@@ -1,0 +1,211 @@
+/**
+ * AI Routes - Handles AI-based logic endpoints
+ *
+ * Endpoints:
+ * 1. POST /api/ai/price-suggestion - Calculate optimal price for millet
+ * 2. GET  /api/ai/demand-forecast - Forecast demand for different millets
+ * 3. POST /api/ai/quality-check - Detect quality anomalies
+ */
+
+import express from "express";
+import {
+  calculatePriceSuggestion,
+  getPriceRecommendation,
+  forecastDemand,
+  performQualityCheck,
+  getSmartProductMatches,
+} from "../services/ai.service.js";
+
+const router = express.Router();
+
+/**
+ * POST /api/ai/price-suggestion
+ * Calculate optimal price based on market conditions
+ *
+ * Body: {
+ *   milletType: string (e.g., "Finger Millet", "Pearl Millet")
+ *   quantity: number (in kg)
+ *   location: string (e.g., "Karnataka", "Tamil Nadu")
+ *   quality: string (optional: "Premium", "Standard", "Basic")
+ * }
+ */
+router.post("/price-suggestion", async (req, res) => {
+  try {
+    const { milletType, quantity, location, quality } = req.body;
+
+    // Validate input
+    if (!milletType || !quantity || !location) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        required: ["milletType", "quantity", "location"],
+      });
+    }
+
+    // Call AI service to calculate price
+    const result = await calculatePriceSuggestion({
+      milletType,
+      quantity,
+      location,
+      quality: quality || "Standard",
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error("Price suggestion error:", error);
+    res.status(500).json({
+      error: "Failed to calculate price suggestion",
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/ai/price-recommendation
+ * Generate AI-powered listing price recommendation before SHG verification.
+ *
+ * Body: {
+ *   milletType: string
+ *   quantity: number (kg)
+ *   location: string
+ *   quality?: string
+ *   taluk?: string
+ * }
+ *
+ * Response: {
+ *   recommendedPricePerKg: number,
+ *   suggestedPriceRange: { min: number, max: number },
+ *   demandLevel: "High" | "Medium" | "Low",
+ *   expectedSaleTime: string,
+ *   reasoning: string
+ * }
+ */
+router.post("/price-recommendation", async (req, res) => {
+  try {
+    const { milletType, quantity, location, quality, taluk } = req.body || {};
+
+    if (!milletType || !quantity || !location) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        required: ["milletType", "quantity", "location"],
+      });
+    }
+
+    const recommendation = await getPriceRecommendation({
+      milletType,
+      quantity: Number(quantity),
+      location,
+      quality,
+      taluk,
+    });
+
+    return res.json(recommendation);
+  } catch (error) {
+    console.error("Price recommendation error:", error);
+    return res.status(500).json({
+      error: "Failed to generate price recommendation",
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/ai/demand-forecast
+ * Forecast demand levels for all millet types
+ *
+ * Query params:
+ *   location: string (optional)
+ *   period: string (optional: "weekly", "monthly", "quarterly")
+ */
+router.get("/demand-forecast", async (req, res) => {
+  try {
+    const { location, period } = req.query;
+
+    // Call AI service to forecast demand
+    const forecast = await forecastDemand({
+      location: location || "All India",
+      period: period || "monthly",
+    });
+
+    res.json(forecast);
+  } catch (error) {
+    console.error("Demand forecast error:", error);
+    res.status(500).json({
+      error: "Failed to generate demand forecast",
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/ai/quality-check
+ * Detect quality anomalies in a batch
+ *
+ * Body: {
+ *   batchId: string
+ *   milletType: string
+ *   moistureContent: number (percentage)
+ *   impurityLevel: number (percentage)
+ *   grainSize: string ("Uniform", "Mixed", "Small")
+ *   color: string ("Natural", "Discolored", "Mixed")
+ *   weight: number (actual weight in kg)
+ *   expectedWeight: number (expected weight in kg)
+ * }
+ */
+router.post("/quality-check", async (req, res) => {
+  try {
+    const batchData = req.body;
+
+    // Validate required fields
+    if (!batchData.batchId || !batchData.milletType) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        required: ["batchId", "milletType"],
+      });
+    }
+
+    // Perform quality check
+    const qualityResult = await performQualityCheck(batchData);
+
+    res.json(qualityResult);
+  } catch (error) {
+    console.error("Quality check error:", error);
+    res.status(500).json({
+      error: "Failed to perform quality check",
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/ai/smart-match
+ * Find top millet listings for consumer preferences
+ *
+ * Body: {
+ *   maxPrice: number
+ *   preferredQuality: string ("Premium" | "Standard" | "Basic")
+ *   milletTypes?: string[]
+ *   maxDistance?: number
+ * }
+ */
+router.post("/smart-match", async (req, res) => {
+  try {
+    const preferences = req.body || {};
+
+    if (!preferences.maxPrice || Number(preferences.maxPrice) <= 0) {
+      return res.status(400).json({
+        error: "Missing or invalid maxPrice",
+      });
+    }
+
+    const result = await getSmartProductMatches(preferences);
+    res.json(result);
+  } catch (error) {
+    console.error("Smart match error:", error);
+    res.status(500).json({
+      error: "Failed to generate smart matches",
+      message: error.message,
+    });
+  }
+});
+
+export default router;
